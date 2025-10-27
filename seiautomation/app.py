@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from typing import Callable, Dict
+from urllib.parse import urlparse
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .config import Settings
 from .tasks import download_zip_lote, preencher_anotacoes_ok, exportar_relacao_csv
+from .devserver import is_devserver_running, start_devserver, stop_devserver
 
 
 class Worker(QtCore.QThread):
@@ -48,6 +50,7 @@ class MainWindow(QtWidgets.QWidget):
             self.checkbox_auto_credentials.setToolTip("Disponível apenas para administradores.")
         self.checkbox_dev_mode = QtWidgets.QCheckBox("Modo desenvolvedor (usar servidor fake)")
         self.checkbox_dev_mode.setChecked(self.settings.dev_mode)
+        self.checkbox_dev_mode.stateChanged.connect(self._on_dev_mode_changed)
 
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
@@ -56,6 +59,10 @@ class MainWindow(QtWidgets.QWidget):
         self.run_button.clicked.connect(self._start_tasks)
         self.close_button = QtWidgets.QPushButton("Fechar")
         self.close_button.clicked.connect(self.close)
+        self.devserver_button = QtWidgets.QPushButton()
+        self.devserver_button.clicked.connect(self._on_devserver_button)
+        self.devserver_status = QtWidgets.QLabel()
+        self.devserver_status.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
 
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addWidget(self.run_button)
@@ -78,11 +85,23 @@ class MainWindow(QtWidgets.QWidget):
         layout.addWidget(self.checkbox_headless)
         layout.addWidget(self.checkbox_auto_credentials)
         layout.addWidget(self.checkbox_dev_mode)
+        devserver_layout = QtWidgets.QHBoxLayout()
+        devserver_layout.addWidget(self.devserver_button)
+        devserver_layout.addWidget(self.devserver_status)
+        devserver_layout.addStretch()
+        layout.addLayout(devserver_layout)
         layout.addWidget(self.log)
         layout.addLayout(button_layout)
 
         self.worker: Worker | None = None
+        self.devserver_started_here = False
         self._setup_tray_icon()
+        self._refresh_devserver_controls()
+        app_instance = QtWidgets.QApplication.instance()
+        if app_instance is not None:
+            app_instance.aboutToQuit.connect(self._on_app_quit)
+        if self.settings.dev_mode:
+            self._ensure_devserver_running(self.settings, show_dialog=False)
 
     def _setup_tray_icon(self) -> None:
         icon = self.style().standardIcon(QtWidgets.QStyle.SP_ComputerIcon)
@@ -115,12 +134,22 @@ class MainWindow(QtWidgets.QWidget):
         bloco_id = self._resolve_bloco_id()
         if bloco_id is None:
             return
+
+        effective_headless = headless
+        if headless and not auto_credentials:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "SEIAutomation",
+                "Para login manual é necessário executar com o navegador visível. O navegador será aberto nesta execução e, ao finalizar, o modo headless permanecerá marcado para futuras execuções.",
+            )
+            effective_headless = False
+            self._append_log("Executando com navegador visível apenas para esta execução (login manual requerido).")
         runtime_settings = self.settings.with_dev_mode(dev_mode)
 
         if self.checkbox_download.isChecked():
             tasks_to_run["Download de ZIPs"] = lambda progress, cfg=runtime_settings: download_zip_lote(
                 cfg,
-                headless=headless,
+                headless=effective_headless,
                 progress=progress,
                 auto_credentials=auto_credentials,
                 bloco_id=bloco_id,
@@ -128,7 +157,7 @@ class MainWindow(QtWidgets.QWidget):
         if self.checkbox_anotacoes.isChecked():
             tasks_to_run["Atualização de anotações"] = lambda progress, cfg=runtime_settings: preencher_anotacoes_ok(
                 cfg,
-                headless=headless,
+                headless=effective_headless,
                 progress=progress,
                 auto_credentials=auto_credentials,
                 bloco_id=bloco_id,
@@ -136,7 +165,7 @@ class MainWindow(QtWidgets.QWidget):
         if self.checkbox_export.isChecked():
             tasks_to_run["Exportar relação"] = lambda progress, cfg=runtime_settings: exportar_relacao_csv(
                 cfg,
-                headless=headless,
+                headless=effective_headless,
                 progress=progress,
                 bloco_id=bloco_id,
                 auto_credentials=auto_credentials,
@@ -144,6 +173,9 @@ class MainWindow(QtWidgets.QWidget):
 
         if not tasks_to_run:
             QtWidgets.QMessageBox.information(self, "SEIAutomation", "Selecione ao menos uma tarefa.")
+            return
+
+        if dev_mode and not self._ensure_devserver_running(runtime_settings):
             return
 
         self.run_button.setEnabled(False)
@@ -176,6 +208,78 @@ class MainWindow(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(self, "SEIAutomation", "ID do bloco inválido.")
             return None
         return bloco_id
+
+    def _on_dev_mode_changed(self, state: int) -> None:
+        checked = state == QtCore.Qt.CheckState.Checked
+        self._refresh_devserver_controls()
+        if checked:
+            self._ensure_devserver_running(self.settings.with_dev_mode(True), show_dialog=False)
+
+    def _on_devserver_button(self) -> None:
+        base_url = self.settings.dev_base_url
+        if not base_url:
+            QtWidgets.QMessageBox.warning(self, "SEIAutomation", "URL do servidor fake não configurada.")
+            return
+        running = is_devserver_running(base_url)
+        if running:
+            success, message, stopped = stop_devserver()
+            self._append_log(message)
+            if success and stopped:
+                self.devserver_started_here = False
+        else:
+            success, message, started = start_devserver(base_url)
+            self._append_log(message)
+            if success and started:
+                self.devserver_started_here = True
+        self._refresh_devserver_controls()
+
+    def _devserver_host_port(self) -> tuple[str, int]:
+        parsed = urlparse(self.settings.dev_base_url or "http://127.0.0.1:8001/sei/")
+        scheme = parsed.scheme or "http"
+        port = parsed.port or (443 if scheme == "https" else 80)
+        host = parsed.hostname or "127.0.0.1"
+        return host, port
+
+    def _refresh_devserver_controls(self) -> None:
+        host, port = self._devserver_host_port()
+        base_url = self.settings.dev_base_url
+        manageable = host in {"127.0.0.1", "localhost"}
+        running = is_devserver_running(base_url) if base_url else False
+        if manageable:
+            self.devserver_button.setEnabled(True)
+            self.devserver_button.setText("Parar servidor fake" if running else "Iniciar servidor fake")
+            status = f"Servidor fake {'ativo' if running else 'desligado'} em {host}:{port}"
+        else:
+            self.devserver_button.setEnabled(False)
+            self.devserver_button.setText("Iniciar servidor fake")
+            status = (
+                f"Servidor remoto em {host}:{port}. Inicie manualmente."
+                if running
+                else "Servidor remoto — inicie manualmente."
+            )
+        self.devserver_status.setText(status)
+
+    def _ensure_devserver_running(self, runtime_settings: Settings, *, show_dialog: bool = True) -> bool:
+        base_url = runtime_settings.dev_base_url
+        if not base_url:
+            if show_dialog:
+                QtWidgets.QMessageBox.warning(self, "SEIAutomation", "URL do servidor fake não configurada.")
+            return False
+        if is_devserver_running(base_url):
+            self._refresh_devserver_controls()
+            return True
+        success, message, started = start_devserver(base_url)
+        self._append_log(message)
+        if success and started:
+            self.devserver_started_here = True
+        self._refresh_devserver_controls()
+        if not success and show_dialog:
+            QtWidgets.QMessageBox.warning(self, "SEIAutomation", message)
+        return success
+
+    def _on_app_quit(self) -> None:
+        if self.devserver_started_here:
+            stop_devserver()
 
 
 def run_gui(settings: Settings | None = None) -> None:

@@ -81,7 +81,7 @@ Para abrir a interface (com bandeja do sistema):
 python main.py
 ```
 
-Informe o ID do bloco (padrão: valor de `SEI_BLOCO_ID`), marque as tarefas desejadas — baixar ZIPs, preencher "OK" ou exportar a relação — escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray.
+Informe o ID do bloco (padrão: valor de `SEI_BLOCO_ID`), marque as tarefas desejadas — baixar ZIPs, preencher "OK" ou exportar a relação — escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray. Se o modo headless estiver marcado mas o preenchimento automático estiver desabilitado, o app mostrará um aviso e abrirá o navegador apenas nessa execução para que você faça o login manualmente; ao final, a opção headless permanece marcada para uso futuro.
 
 ### Modo desenvolvedor (servidor fake)
 
@@ -95,7 +95,7 @@ Para testar os scripts sem acessar o SEI real:
 
 2. Ative o modo desenvolvedor:
    - Via `.env`: defina `SEI_DEV_MODE=true` (o endereço padrão é `http://127.0.0.1:8001/sei/`, mas pode ser alterado em `SEI_DEV_BASE_URL`).
-   - Ou na interface gráfica marque o checkbox **Modo desenvolvedor (usar servidor fake)** antes de executar as tarefas.
+   - Ou na interface gráfica marque o checkbox **Modo desenvolvedor (usar servidor fake)** e use o botão **Iniciar servidor fake** para subir/parar o serviço antes de executar as tarefas.
 
    Os scripts abrirão a página simulada e executarão todo o fluxo (downloads, anotações, exportação) contra os elementos fake, permitindo validação local.
 
