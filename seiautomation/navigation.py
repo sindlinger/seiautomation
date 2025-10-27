@@ -22,7 +22,7 @@ def login_and_open_bloco(
     progress: Callable[[str], None] | None = None,
     auto_credentials: bool = True,
 ) -> None:
-    base = settings.base_url
+    base = settings.target_base_url
     login_url = f"{base}controlador.php?acao=procedimento_controlar&id_procedimento=0"
     _log("Acessando página de login…", progress)
     page.goto(login_url, wait_until="domcontentloaded")

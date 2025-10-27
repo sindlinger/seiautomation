@@ -42,6 +42,8 @@ SEI_BLOCO_ID=55
 SEI_DOWNLOAD_DIR=playwright-downloads
 SEI_BASE_URL=https://sei.tjpb.jus.br/sei/
 SEI_IS_ADMIN=false
+SEI_DEV_MODE=false
+SEI_DEV_BASE_URL=http://127.0.0.1:8001/sei/
 ```
 
 ---
@@ -80,6 +82,22 @@ python main.py
 ```
 
 Informe o ID do bloco (padrão: valor de `SEI_BLOCO_ID`), marque as tarefas desejadas — baixar ZIPs, preencher "OK" ou exportar a relação — escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray.
+
+### Modo desenvolvedor (servidor fake)
+
+Para testar os scripts sem acessar o SEI real:
+
+1. Inicie o servidor fake:
+
+   ```bash
+   python -m seiautomation.devserver.app  # escuta em http://127.0.0.1:8001
+   ```
+
+2. Ative o modo desenvolvedor:
+   - Via `.env`: defina `SEI_DEV_MODE=true` (o endereço padrão é `http://127.0.0.1:8001/sei/`, mas pode ser alterado em `SEI_DEV_BASE_URL`).
+   - Ou na interface gráfica marque o checkbox **Modo desenvolvedor (usar servidor fake)** antes de executar as tarefas.
+
+   Os scripts abrirão a página simulada e executarão todo o fluxo (downloads, anotações, exportação) contra os elementos fake, permitindo validação local.
 
 ---
 

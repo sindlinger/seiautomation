@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +18,8 @@ class Settings:
     base_url: str
     download_dir: Path
     is_admin: bool
+    dev_mode: bool
+    dev_base_url: str
 
     @staticmethod
     def load() -> "Settings":
@@ -34,6 +36,10 @@ class Settings:
         download_dir = Path(os.getenv("SEI_DOWNLOAD_DIR", "playwright-downloads")).expanduser()
         download_dir.mkdir(parents=True, exist_ok=True)
         is_admin = os.getenv("SEI_IS_ADMIN", "false").strip().lower() in {"1", "true", "yes", "sim"}
+        dev_mode = os.getenv("SEI_DEV_MODE", "false").strip().lower() in {"1", "true", "yes", "sim"}
+        dev_base_url = os.getenv("SEI_DEV_BASE_URL", "http://127.0.0.1:8001/sei/").strip()
+        if dev_base_url:
+            dev_base_url = dev_base_url.rstrip("/") + "/"
 
         return Settings(
             username=username,
@@ -42,4 +48,15 @@ class Settings:
             base_url=base_url,
             download_dir=download_dir,
             is_admin=is_admin,
+            dev_mode=dev_mode,
+            dev_base_url=dev_base_url,
         )
+
+    @property
+    def target_base_url(self) -> str:
+        return self.dev_base_url if self.dev_mode and self.dev_base_url else self.base_url
+
+    def with_dev_mode(self, enabled: bool) -> "Settings":
+        if enabled == self.dev_mode:
+            return self
+        return replace(self, dev_mode=enabled)

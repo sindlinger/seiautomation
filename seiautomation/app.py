@@ -46,6 +46,8 @@ class MainWindow(QtWidgets.QWidget):
         if not self.settings.is_admin:
             self.checkbox_auto_credentials.setEnabled(False)
             self.checkbox_auto_credentials.setToolTip("Disponível apenas para administradores.")
+        self.checkbox_dev_mode = QtWidgets.QCheckBox("Modo desenvolvedor (usar servidor fake)")
+        self.checkbox_dev_mode.setChecked(self.settings.dev_mode)
 
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
@@ -75,6 +77,7 @@ class MainWindow(QtWidgets.QWidget):
         layout.addWidget(self.checkbox_export)
         layout.addWidget(self.checkbox_headless)
         layout.addWidget(self.checkbox_auto_credentials)
+        layout.addWidget(self.checkbox_dev_mode)
         layout.addWidget(self.log)
         layout.addLayout(button_layout)
 
@@ -108,29 +111,31 @@ class MainWindow(QtWidgets.QWidget):
         tasks_to_run: Dict[str, Callable[[Callable[[str], None]], None]] = {}
         headless = self.checkbox_headless.isChecked()
         auto_credentials = self.checkbox_auto_credentials.isChecked() and self.settings.is_admin
+        dev_mode = self.checkbox_dev_mode.isChecked()
         bloco_id = self._resolve_bloco_id()
         if bloco_id is None:
             return
+        runtime_settings = self.settings.with_dev_mode(dev_mode)
 
         if self.checkbox_download.isChecked():
-            tasks_to_run["Download de ZIPs"] = lambda progress: download_zip_lote(
-                self.settings,
+            tasks_to_run["Download de ZIPs"] = lambda progress, cfg=runtime_settings: download_zip_lote(
+                cfg,
                 headless=headless,
                 progress=progress,
                 auto_credentials=auto_credentials,
                 bloco_id=bloco_id,
             )
         if self.checkbox_anotacoes.isChecked():
-            tasks_to_run["Atualização de anotações"] = lambda progress: preencher_anotacoes_ok(
-                self.settings,
+            tasks_to_run["Atualização de anotações"] = lambda progress, cfg=runtime_settings: preencher_anotacoes_ok(
+                cfg,
                 headless=headless,
                 progress=progress,
                 auto_credentials=auto_credentials,
                 bloco_id=bloco_id,
             )
         if self.checkbox_export.isChecked():
-            tasks_to_run["Exportar relação"] = lambda progress: exportar_relacao_csv(
-                self.settings,
+            tasks_to_run["Exportar relação"] = lambda progress, cfg=runtime_settings: exportar_relacao_csv(
+                cfg,
                 headless=headless,
                 progress=progress,
                 bloco_id=bloco_id,
@@ -145,6 +150,8 @@ class MainWindow(QtWidgets.QWidget):
         self.worker = Worker(tasks_to_run)
         self.worker.log_signal.connect(self._append_log)
         self.worker.finished_signal.connect(self._on_tasks_finished)
+        if dev_mode:
+            self._append_log("Modo desenvolvedor ativo: utilizando servidor fake.")
         self.worker.start()
 
     def _on_tasks_finished(self, success: bool, message: str) -> None:

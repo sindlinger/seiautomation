@@ -106,10 +106,17 @@ def execute_task(
         progress("Aviso: usuário não tem permissão para auto-preenchimento. Continuando em modo manual.")
 
     automation_settings = AutomationSettings.load()
+    if task_request.dev_mode is not None:
+        automation_settings = automation_settings.with_dev_mode(task_request.dev_mode)
     if task_request.bloco_id:
         automation_settings = replace(automation_settings, bloco_id=task_request.bloco_id)
 
-    request_payload = task_request.model_copy(update={"auto_credentials": auto_credentials})
+    request_payload = task_request.model_copy(
+        update={
+            "auto_credentials": auto_credentials,
+            "dev_mode": automation_settings.dev_mode,
+        }
+    )
 
     task.handler(
         automation_settings,
