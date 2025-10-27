@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 _PID_FILE = Path.home() / ".seiautomation-devserver.pid"
@@ -30,7 +31,17 @@ def _clear_pid() -> None:
         pass
 
 
-def is_devserver_running() -> bool:
+def _parse_base_url(base_url: str | None) -> tuple[str, int]:
+    if not base_url:
+        return "127.0.0.1", 8001
+    parsed = urlparse(base_url)
+    host = parsed.hostname or "127.0.0.1"
+    scheme = parsed.scheme or "http"
+    port = parsed.port or (443 if scheme == "https" else 8001)
+    return host, port
+
+
+def is_devserver_running(base_url: str | None = None) -> bool:
     pid = _read_pid()
     if not pid:
         return False
@@ -43,9 +54,10 @@ def is_devserver_running() -> bool:
     return True
 
 
-def start_devserver(host: str = "127.0.0.1", port: int = 8001) -> bool:
-    if is_devserver_running():
-        return True
+def start_devserver(base_url: str | None = None) -> tuple[bool, str, bool]:
+    host, port = _parse_base_url(base_url)
+    if is_devserver_running(base_url):
+        return False, f"Servidor fake já em execução em {host}:{port}.", False
 
     cmd = [
         sys.executable,
@@ -62,23 +74,26 @@ def start_devserver(host: str = "127.0.0.1", port: int = 8001) -> bool:
     if sys.platform.startswith("win"):
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
 
-    proc = subprocess.Popen(
+    try:
+        proc = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=creationflags,
-    )
+        )
+    except FileNotFoundError:
+        return False, "Não foi possível iniciar uvicorn. Verifique se as dependências do backend estão instaladas.", False
     _write_pid(proc.pid)
 
     # Give uvicorn a moment to start
     time.sleep(1.0)
-    return True
+    return True, f"Servidor fake iniciado em {host}:{port}.", True
 
 
-def stop_devserver() -> bool:
+def stop_devserver(base_url: str | None = None) -> tuple[bool, str, bool]:
     pid = _read_pid()
     if not pid:
-        return False
+        return False, "Servidor fake não está em execução.", False
     try:
         if sys.platform.startswith("win"):
             os.kill(pid, signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
@@ -87,5 +102,5 @@ def stop_devserver() -> bool:
     except OSError:
         pass
     _clear_pid()
-    return True
-
+    host, port = _parse_base_url(base_url)
+    return True, f"Servidor fake finalizado em {host}:{port}.", True

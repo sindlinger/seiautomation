@@ -222,7 +222,7 @@ class MainWindow(QtWidgets.QWidget):
             return
         running = is_devserver_running(base_url)
         if running:
-            success, message, stopped = stop_devserver()
+            success, message, stopped = stop_devserver(base_url)
             self._append_log(message)
             if success and stopped:
                 self.devserver_started_here = False
