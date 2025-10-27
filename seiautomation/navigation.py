@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable
+import time
+from typing import Callable, Tuple
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
@@ -14,6 +15,16 @@ def _log(message: str, progress: Callable[[str], None] | None) -> None:
         print(message)
 
 
+def _select_active_page(page: Page, base_host: str) -> Tuple[Page, bool]:
+    context = page.context
+    pages = [p for p in context.pages if not p.is_closed()]
+    for candidate in pages[::-1]:  # check newest first
+        url = candidate.url or ""
+        if base_host in url:
+            return candidate, candidate is not page
+    return page, False
+
+
 def login_and_open_bloco(
     page: Page,
     settings: Settings,
@@ -24,6 +35,7 @@ def login_and_open_bloco(
 ) -> None:
     base = settings.target_base_url
     login_url = f"{base}controlador.php?acao=procedimento_controlar&id_procedimento=0"
+    base_host = settings.target_base_url.split("//", 1)[-1].split("/", 1)[0]
     _log("Acessando página de login…", progress)
     page.goto(login_url, wait_until="domcontentloaded")
     if auto_credentials:
@@ -35,12 +47,37 @@ def login_and_open_bloco(
         _log("Aguardando login manual do usuário…", progress)
 
     wait_timeout = 120000 if not auto_credentials else 30000
-    try:
-        page.wait_for_url("**infra_unidade_atual**", timeout=wait_timeout, wait_until="domcontentloaded")
-    except PlaywrightTimeoutError as exc:
-        if "infra_unidade_atual" not in page.url:
-            raise exc
-        _log("Aviso: tempo limite atingido aguardando o carregamento completo pós-login, prosseguindo assim mesmo.", progress)
+
+    if not auto_credentials:
+        deadline = time.time() + wait_timeout / 1000
+        active_page = page
+        manual_detected = False
+        while time.time() < deadline:
+            active_page, switched = _select_active_page(active_page, base_host)
+            if switched:
+                page = active_page
+            url = active_page.url or ""
+            if "infra_unidade_atual" in url:
+                manual_detected = True
+                break
+            time.sleep(0.3)
+        if not manual_detected:
+            raise PlaywrightTimeoutError("Timeout aguardando conclusão do login manual.")
+    else:
+        try:
+            page.wait_for_url("**infra_unidade_atual**", timeout=wait_timeout, wait_until="domcontentloaded")
+        except PlaywrightTimeoutError as exc:
+            if "infra_unidade_atual" not in page.url:
+                raise exc
+            _log(
+                "Aviso: tempo limite atingido aguardando o carregamento completo pós-login, prosseguindo assim mesmo.",
+                progress,
+            )
+
+    if page.is_closed():
+        page, _ = _select_active_page(page, base_host)
+
+    page.bring_to_front()
 
     _log("Abrindo menu Blocos › Internos…", progress)
     page.locator("a:has-text('Blocos')").first.click()
