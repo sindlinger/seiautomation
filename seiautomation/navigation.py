@@ -34,7 +34,8 @@ def login_and_open_bloco(
     else:
         _log("Aguardando login manual do usuário…", progress)
 
-    page.wait_for_url("**infra_unidade_atual**")
+    wait_timeout = 120000 if not auto_credentials else 30000
+    page.wait_for_url("**infra_unidade_atual**", timeout=wait_timeout)
 
     _log("Abrindo menu Blocos › Internos…", progress)
     page.locator("a:has-text('Blocos')").first.click()
