@@ -109,19 +109,28 @@ class MainWindow(QtWidgets.QWidget):
         self.tray = QtWidgets.QSystemTrayIcon(icon, self)
         self.tray.setToolTip("SEIAutomation")
 
-        menu = QtWidgets.QMenu()
-        action_show = menu.addAction("Abrir janela")
-        action_show.triggered.connect(self.showNormal)
-        action_quit = menu.addAction("Sair")
-        action_quit.triggered.connect(QtWidgets.QApplication.instance().quit)
-        self.tray.setContextMenu(menu)
+        self.tray_menu = QtWidgets.QMenu()
+        self.tray_action_show = self.tray_menu.addAction("Abrir SEIAutomation")
+        self.tray_action_show.triggered.connect(self.show_from_tray)
+        self.tray_menu.addSeparator()
+        self.tray_action_devserver = self.tray_menu.addAction("Iniciar servidor fake")
+        self.tray_action_devserver.triggered.connect(self._on_devserver_button)
+        self.tray_menu.addSeparator()
+        self.tray_action_quit = self.tray_menu.addAction("Sair")
+        self.tray_action_quit.triggered.connect(self._quit_application)
+
+        self.tray_menu.aboutToShow.connect(self._refresh_devserver_controls)
+        self.tray.setContextMenu(self.tray_menu)
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
     def _on_tray_activated(self, reason: QtWidgets.QSystemTrayIcon.ActivationReason) -> None:
         if reason == QtWidgets.QSystemTrayIcon.DoubleClick:
-            self.showNormal()
-            self.activateWindow()
+            self.show_from_tray()
+
+    def show_from_tray(self) -> None:
+        self.showNormal()
+        self.activateWindow()
 
     def _append_log(self, message: str) -> None:
         self.log.appendPlainText(message)
@@ -259,6 +268,21 @@ class MainWindow(QtWidgets.QWidget):
                 else "Servidor remoto — inicie manualmente."
             )
         self.devserver_status.setText(status)
+        self._update_tray_devserver_action(running, manageable)
+
+    def _update_tray_devserver_action(self, running: bool, manageable: bool) -> None:
+        if not hasattr(self, "tray_action_devserver"):
+            return
+        if not self.checkbox_dev_mode.isChecked():
+            self.tray_action_devserver.setText("Servidor fake (habilite modo dev)")
+            self.tray_action_devserver.setEnabled(False)
+            return
+        if not manageable:
+            self.tray_action_devserver.setText("Servidor fake remoto")
+            self.tray_action_devserver.setEnabled(False)
+            return
+        self.tray_action_devserver.setText("Parar servidor fake" if running else "Iniciar servidor fake")
+        self.tray_action_devserver.setEnabled(True)
 
     def _ensure_devserver_running(self, runtime_settings: Settings, *, show_dialog: bool = True) -> bool:
         base_url = runtime_settings.dev_base_url
@@ -281,6 +305,9 @@ class MainWindow(QtWidgets.QWidget):
     def _on_app_quit(self) -> None:
         if self.devserver_started_here:
             stop_devserver()
+
+    def _quit_application(self) -> None:
+        QtWidgets.QApplication.instance().quit()
 
 
 def run_gui(settings: Settings | None = None) -> None:
