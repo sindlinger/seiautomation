@@ -95,7 +95,7 @@ Para testar os scripts sem acessar o SEI real:
 
 2. Ative o modo desenvolvedor:
    - Via `.env`: defina `SEI_DEV_MODE=true` (o endereço padrão é `http://127.0.0.1:8001/sei/`, mas pode ser alterado em `SEI_DEV_BASE_URL`).
-   - Ou na interface gráfica marque o checkbox **Modo desenvolvedor (usar servidor fake)** e use o botão **Iniciar servidor fake** para subir/parar o serviço antes de executar as tarefas.
+   - Ou na interface gráfica marque o checkbox **Modo desenvolvedor (usar servidor fake)**. O botão **Iniciar servidor fake** controla o serviço manualmente, mas o aplicativo também tenta iniciá-lo automaticamente quando você clicar em **Executar tarefas**.
 
    Os scripts abrirão a página simulada e executarão todo o fluxo (downloads, anotações, exportação) contra os elementos fake, permitindo validação local.
 

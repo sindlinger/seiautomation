@@ -60,6 +60,7 @@ class MainWindow(QtWidgets.QWidget):
         self.close_button = QtWidgets.QPushButton("Fechar")
         self.close_button.clicked.connect(self.close)
         self.devserver_button = QtWidgets.QPushButton()
+        self.devserver_button.setMaximumWidth(170)
         self.devserver_button.clicked.connect(self._on_devserver_button)
         self.devserver_status = QtWidgets.QLabel()
         self.devserver_status.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
