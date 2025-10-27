@@ -1,0 +1,97 @@
+# SEIAutomation
+
+Automação das tarefas repetitivas no SEI/TJPB. O projeto fornece:
+
+1. **Scripts reutilizáveis**
+   - Download dos processos do bloco interno configurado (ex.: *Peritos – bloco 55*) em formato ZIP.
+   - Preenchimento automático do campo "Anotações" com o texto **OK** nos processos que ainda não possuem esse status.
+
+2. **Aplicativo com interface (PySide6)**
+   - Ícone na bandeja do sistema.
+   - Janela simples com checkboxes para escolher quais tarefas executar e se o navegador roda em modo headless.
+
+Compatível com Windows e WSL (necessário Python 3.10+).
+
+---
+
+## Instalação
+
+1. **Criar e ativar um ambiente virtual (recomendado)**
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Linux/WSL
+.venv\Scripts\activate           # Windows
+```
+
+2. **Instalar dependências**
+
+```bash
+pip install -r requirements.txt
+playwright install chromium
+```
+
+3. **Configurar variáveis**
+
+Copie `.env.example` para `.env` e informe usuário/senha:
+
+```
+SEI_USERNAME=00000000000
+SEI_PASSWORD=sua_senha
+SEI_BLOCO_ID=55
+SEI_DOWNLOAD_DIR=playwright-downloads
+SEI_BASE_URL=https://sei.tjpb.jus.br/sei/
+SEI_IS_ADMIN=false
+```
+
+---
+
+## Uso dos scripts
+
+Você pode chamar as funções diretamente em Python:
+
+```python
+from seiautomation.config import Settings
+from seiautomation.tasks import download_zip_lote, preencher_anotacoes_ok
+
+settings = Settings.load()
+
+# Baixa todos os ZIPs (ignora os que já existem)
+download_zip_lote(settings, headless=True)
+
+# Preenche anotações com "OK"
+preencher_anotacoes_ok(settings, headless=False)
+```
+
+`headless=True` executa sem abrir a janela do navegador. Há também o parâmetro `auto_credentials` para desabilitar o preenchimento automático de login (a interface só habilita essa opção para administradores – `SEI_IS_ADMIN=true`).
+
+---
+
+## Aplicativo gráfico
+
+Para abrir a interface (com bandeja do sistema):
+
+```bash
+python main.py
+```
+
+Selecione as tarefas desejadas, escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray.
+
+---
+
+## Gerar executável (opcional)
+
+Requer [PyInstaller](https://pyinstaller.org/):
+
+```bash
+pip install pyinstaller
+pyinstaller --noconfirm --windowed --onefile main.py
+```
+
+O executável ficará em `dist/main.exe`.
+
+---
+
+## Integração com automações futuras
+
+Os módulos estão organizados para permitir inclusão de novas tarefas. Cada rotina deve receber um objeto `Settings` e uma função de `progress` opcional, garantindo que possam ser reutilizadas tanto pelos scripts quanto pela GUI ou qualquer outro orquestrador (por exemplo, chamadas via Docker/MCP/Codex CLI).
