@@ -95,3 +95,45 @@ O executável ficará em `dist/main.exe`.
 ## Integração com automações futuras
 
 Os módulos estão organizados para permitir inclusão de novas tarefas. Cada rotina deve receber um objeto `Settings` e uma função de `progress` opcional, garantindo que possam ser reutilizadas tanto pelos scripts quanto pela GUI ou qualquer outro orquestrador (por exemplo, chamadas via Docker/MCP/Codex CLI).
+
+---
+
+## Backend API (FastAPI)
+
+O diretório `backend/app` contém uma API que expõe autenticação, catálogo de tarefas e execução assíncrona.
+
+### Instalação
+
+```bash
+pip install -r requirements.txt
+playwright install chromium      # necessário para as tarefas reutilizadas
+```
+
+Defina no `.env` os valores:
+
+```
+APP_DATABASE_URL=sqlite:///./seiautomation.db
+APP_JWT_SECRET=troque_esta_chave
+APP_JWT_EXPIRES_MINUTES=120
+```
+
+Crie o primeiro administrador:
+
+```bash
+python -m backend.app.manage create-admin --email admin@exemplo.com
+```
+
+### Execução
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+Rotas principais:
+
+- `POST /auth/login` – retorna JWT.
+- `GET /tasks/` – lista tarefas disponíveis.
+- `POST /tasks/run` – dispara uma execução (necessita token).
+- `GET /tasks/runs` – histórico do usuário (ou de todos, se admin).
+
+As execuções reutilizam `seiautomation.tasks` e respeitam as permissões `allow_auto_credentials` dos usuários.
