@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Dict, Iterable
 
 from seiautomation.config import Settings as AutomationSettings
-from seiautomation.tasks import download_zip_lote, preencher_anotacoes_ok
+from seiautomation.tasks import download_zip_lote, preencher_anotacoes_ok, exportar_relacao_csv
 
 from .models import User
 from .schemas import TaskDefinition, TaskRunCreate
@@ -31,6 +31,7 @@ def _download_handler(
         skip_existentes=True,
         limite=request.limit,
         auto_credentials=request.auto_credentials,
+        bloco_id=request.bloco_id,
     )
 
 
@@ -44,6 +45,22 @@ def _annotate_handler(
         settings,
         headless=request.headless,
         progress=progress,
+        auto_credentials=request.auto_credentials,
+        bloco_id=request.bloco_id,
+    )
+
+
+def _export_handler(
+    settings: AutomationSettings,
+    request: TaskRunCreate,
+    user: User,
+    progress: Callable[[str], None],
+) -> None:
+    exportar_relacao_csv(
+        settings,
+        headless=request.headless,
+        progress=progress,
+        bloco_id=request.bloco_id,
         auto_credentials=request.auto_credentials,
     )
 
@@ -60,6 +77,12 @@ TASKS: Dict[str, RegisteredTask] = {
         name="Atualizar anotações",
         description='Preenche o campo "Anotações" com o texto OK para os processos do bloco.',
         handler=_annotate_handler,
+    ),
+    "export_relation": RegisteredTask(
+        slug="export_relation",
+        name="Exportar relação",
+        description="Exporta a lista de processos do bloco para CSV.",
+        handler=_export_handler,
     ),
 }
 
@@ -83,15 +106,14 @@ def execute_task(
         progress("Aviso: usuário não tem permissão para auto-preenchimento. Continuando em modo manual.")
 
     automation_settings = AutomationSettings.load()
+    if task_request.bloco_id:
+        automation_settings = replace(automation_settings, bloco_id=task_request.bloco_id)
+
+    request_payload = task_request.model_copy(update={"auto_credentials": auto_credentials})
+
     task.handler(
         automation_settings,
-        TaskRunCreate(
-            task_slug=task_request.task_slug,
-            headless=task_request.headless,
-            auto_credentials=auto_credentials,
-            limit=task_request.limit,
-        ),
+        request_payload,
         user,
         progress,
     )
-

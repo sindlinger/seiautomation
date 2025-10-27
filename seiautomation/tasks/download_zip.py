@@ -74,6 +74,7 @@ def download_zip_lote(
     skip_existentes: bool = True,
     limite: int | None = None,
     auto_credentials: bool = True,
+    bloco_id: int | None = None,
 ) -> Iterable[str]:
     """
     Faz o download em lote dos ZIPs do bloco configurado.
@@ -90,9 +91,17 @@ def download_zip_lote(
     """
 
     arquivos_gerados: list[str] = []
+    target_bloco = bloco_id or settings.bloco_id
+
     with launch_session(headless=headless) as session:
         page = session.page
-        login_and_open_bloco(page, settings, progress=progress, auto_credentials=auto_credentials)
+        login_and_open_bloco(
+            page,
+            settings,
+            bloco_id=target_bloco,
+            progress=progress,
+            auto_credentials=auto_credentials,
+        )
         download_dir = settings.download_dir
 
         contador = 0

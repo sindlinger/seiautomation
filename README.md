@@ -57,10 +57,14 @@ from seiautomation.tasks import download_zip_lote, preencher_anotacoes_ok
 settings = Settings.load()
 
 # Baixa todos os ZIPs (ignora os que já existem)
-download_zip_lote(settings, headless=True)
+download_zip_lote(settings, headless=True, bloco_id=55)
 
 # Preenche anotações com "OK"
-preencher_anotacoes_ok(settings, headless=False)
+preencher_anotacoes_ok(settings, headless=False, bloco_id=55)
+
+# Exporta a lista do bloco para CSV
+from seiautomation.tasks import exportar_relacao_csv
+exportar_relacao_csv(settings, bloco_id=55)
 ```
 
 `headless=True` executa sem abrir a janela do navegador. Há também o parâmetro `auto_credentials` para desabilitar o preenchimento automático de login (a interface só habilita essa opção para administradores – `SEI_IS_ADMIN=true`).
@@ -75,7 +79,7 @@ Para abrir a interface (com bandeja do sistema):
 python main.py
 ```
 
-Selecione as tarefas desejadas, escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray.
+Informe o ID do bloco (padrão: valor de `SEI_BLOCO_ID`), marque as tarefas desejadas — baixar ZIPs, preencher "OK" ou exportar a relação — escolha se o navegador deve ser headless e clique em **Executar**. Logs aparecem em tempo real. A janela pode ser minimizada para o tray.
 
 ---
 
@@ -133,7 +137,18 @@ Rotas principais:
 
 - `POST /auth/login` – retorna JWT.
 - `GET /tasks/` – lista tarefas disponíveis.
-- `POST /tasks/run` – dispara uma execução (necessita token).
+- `POST /tasks/run` – dispara uma execução (necessita token). Payload exemplo:
+
+  ```json
+  {
+    "task_slug": "download_zip",
+    "headless": true,
+    "auto_credentials": true,
+    "limit": null,
+    "bloco_id": 55
+  }
+  ```
+- `GET /tasks/runs` – histórico do usuário (ou de todos, se admin).
 - `GET /tasks/runs` – histórico do usuário (ou de todos, se admin).
 
 As execuções reutilizam `seiautomation.tasks` e respeitam as permissões `allow_auto_credentials` dos usuários.

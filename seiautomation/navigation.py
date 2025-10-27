@@ -17,6 +17,7 @@ def _log(message: str, progress: Callable[[str], None] | None) -> None:
 def login_and_open_bloco(
     page: Page,
     settings: Settings,
+    bloco_id: int,
     *,
     progress: Callable[[str], None] | None = None,
     auto_credentials: bool = True,
@@ -41,13 +42,13 @@ def login_and_open_bloco(
     page.locator("a:has-text('Internos')").first.click()
     page.wait_for_url("**acao=bloco_interno_listar**")
 
-    bloco_link = page.locator("tr", has_text=str(settings.bloco_id)).locator("a", has_text=str(settings.bloco_id)).first
+    bloco_link = page.locator("tr", has_text=str(bloco_id)).locator("a", has_text=str(bloco_id)).first
     if bloco_link.count() == 0:
-        raise RuntimeError(f"Bloco {settings.bloco_id} não encontrado na lista.")
+        raise RuntimeError(f"Bloco {bloco_id} não encontrado na lista.")
 
-    _log(f"Abrindo bloco {settings.bloco_id}…", progress)
+    _log(f"Abrindo bloco {bloco_id}…", progress)
     bloco_link.click()
-    page.wait_for_url(f"**id_bloco={settings.bloco_id}**")
+    page.wait_for_url(f"**id_bloco={bloco_id}**")
     page.wait_for_selector("table tr:nth-child(2)")
 
 

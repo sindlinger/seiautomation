@@ -5,7 +5,7 @@ from typing import Callable, Dict
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .config import Settings
-from .tasks import download_zip_lote, preencher_anotacoes_ok
+from .tasks import download_zip_lote, preencher_anotacoes_ok, exportar_relacao_csv
 
 
 class Worker(QtCore.QThread):
@@ -38,6 +38,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.checkbox_download = QtWidgets.QCheckBox("Baixar processos do bloco (ZIP)")
         self.checkbox_anotacoes = QtWidgets.QCheckBox('Preencher anotações com "OK"')
+        self.checkbox_export = QtWidgets.QCheckBox("Exportar relação do bloco (CSV)")
         self.checkbox_headless = QtWidgets.QCheckBox("Executar em modo headless (sem janela)")
         self.checkbox_headless.setChecked(True)
         self.checkbox_auto_credentials = QtWidgets.QCheckBox("Preencher credenciais automaticamente")
@@ -58,9 +59,20 @@ class MainWindow(QtWidgets.QWidget):
         button_layout.addWidget(self.run_button)
         button_layout.addWidget(self.close_button)
 
+        bloco_layout = QtWidgets.QHBoxLayout()
+        bloco_label = QtWidgets.QLabel("ID do bloco:")
+        self.bloco_input = QtWidgets.QLineEdit(str(self.settings.bloco_id))
+        self.bloco_input.setMaximumWidth(120)
+        self.bloco_input.setValidator(QtGui.QIntValidator(1, 999999))
+        bloco_layout.addWidget(bloco_label)
+        bloco_layout.addWidget(self.bloco_input)
+        bloco_layout.addStretch()
+
         layout = QtWidgets.QVBoxLayout(self)
+        layout.addLayout(bloco_layout)
         layout.addWidget(self.checkbox_download)
         layout.addWidget(self.checkbox_anotacoes)
+        layout.addWidget(self.checkbox_export)
         layout.addWidget(self.checkbox_headless)
         layout.addWidget(self.checkbox_auto_credentials)
         layout.addWidget(self.log)
@@ -96,14 +108,33 @@ class MainWindow(QtWidgets.QWidget):
         tasks_to_run: Dict[str, Callable[[Callable[[str], None]], None]] = {}
         headless = self.checkbox_headless.isChecked()
         auto_credentials = self.checkbox_auto_credentials.isChecked() and self.settings.is_admin
+        bloco_id = self._resolve_bloco_id()
+        if bloco_id is None:
+            return
 
         if self.checkbox_download.isChecked():
             tasks_to_run["Download de ZIPs"] = lambda progress: download_zip_lote(
-                self.settings, headless=headless, progress=progress, auto_credentials=auto_credentials
+                self.settings,
+                headless=headless,
+                progress=progress,
+                auto_credentials=auto_credentials,
+                bloco_id=bloco_id,
             )
         if self.checkbox_anotacoes.isChecked():
             tasks_to_run["Atualização de anotações"] = lambda progress: preencher_anotacoes_ok(
-                self.settings, headless=headless, progress=progress, auto_credentials=auto_credentials
+                self.settings,
+                headless=headless,
+                progress=progress,
+                auto_credentials=auto_credentials,
+                bloco_id=bloco_id,
+            )
+        if self.checkbox_export.isChecked():
+            tasks_to_run["Exportar relação"] = lambda progress: exportar_relacao_csv(
+                self.settings,
+                headless=headless,
+                progress=progress,
+                bloco_id=bloco_id,
+                auto_credentials=auto_credentials,
             )
 
         if not tasks_to_run:
@@ -126,6 +157,18 @@ class MainWindow(QtWidgets.QWidget):
         self.hide()
         self.tray.showMessage("SEIAutomation", "Executando em segundo plano. Clique no ícone para reabrir.")
         event.ignore()
+
+    def _resolve_bloco_id(self) -> int | None:
+        text = self.bloco_input.text().strip()
+        if not text:
+            QtWidgets.QMessageBox.warning(self, "SEIAutomation", "Informe o ID do bloco.")
+            return None
+        try:
+            bloco_id = int(text)
+        except ValueError:
+            QtWidgets.QMessageBox.warning(self, "SEIAutomation", "ID do bloco inválido.")
+            return None
+        return bloco_id
 
 
 def run_gui(settings: Settings | None = None) -> None:

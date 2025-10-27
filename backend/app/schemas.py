@@ -55,6 +55,7 @@ class TaskRunCreate(BaseModel):
     headless: bool = True
     auto_credentials: bool = True
     limit: Optional[int] = None
+    bloco_id: Optional[int] = None
 
 
 class TaskRunRead(BaseModel):
@@ -68,4 +69,3 @@ class TaskRunRead(BaseModel):
 
     class Config:
         from_attributes = True
-

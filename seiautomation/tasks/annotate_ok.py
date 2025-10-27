@@ -41,6 +41,7 @@ def preencher_anotacoes_ok(
     headless: bool = True,
     progress: ProgressFn = None,
     auto_credentials: bool = True,
+    bloco_id: int | None = None,
 ) -> int:
     """
     Define o texto \"OK\" em todas as anotações ainda vazias do bloco.
@@ -49,9 +50,16 @@ def preencher_anotacoes_ok(
         Quantidade de processos atualizados.
     """
     total_atualizados = 0
+    target_bloco = bloco_id or settings.bloco_id
     with launch_session(headless=headless) as session:
         page = session.page
-        login_and_open_bloco(page, settings, progress=progress, auto_credentials=auto_credentials)
+        login_and_open_bloco(
+            page,
+            settings,
+            bloco_id=target_bloco,
+            progress=progress,
+            auto_credentials=auto_credentials,
+        )
 
         for row, numero in iterar_paginas(page, progress=progress):
             anotacao = row.locator("td").nth(4).inner_text(timeout=5000).strip()
