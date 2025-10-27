@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from playwright.sync_api import Page
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from .config import Settings
 
@@ -35,7 +35,12 @@ def login_and_open_bloco(
         _log("Aguardando login manual do usuário…", progress)
 
     wait_timeout = 120000 if not auto_credentials else 30000
-    page.wait_for_url("**infra_unidade_atual**", timeout=wait_timeout)
+    try:
+        page.wait_for_url("**infra_unidade_atual**", timeout=wait_timeout, wait_until="domcontentloaded")
+    except PlaywrightTimeoutError as exc:
+        if "infra_unidade_atual" not in page.url:
+            raise exc
+        _log("Aviso: tempo limite atingido aguardando o carregamento completo pós-login, prosseguindo assim mesmo.", progress)
 
     _log("Abrindo menu Blocos › Internos…", progress)
     page.locator("a:has-text('Blocos')").first.click()
