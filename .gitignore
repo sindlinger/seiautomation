@@ -1,4 +1,17 @@
-.env
-__pycache__/
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/playwright-downloads/
+backend/playwright-downloads-dev/
+backend/.env
+
+# Electron
+electron-app/node_modules/
+electron-app/dist/
+electron-app/dist-electron/
+electron-app/.env
+
+# geral
 *.pyc
-playwright-downloads/
+__pycache__/
+.DS_Store
