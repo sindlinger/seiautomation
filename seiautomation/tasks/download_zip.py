@@ -9,6 +9,7 @@ from playwright.sync_api import Locator, Page, TimeoutError
 from ..browser import launch_session
 from ..config import Settings
 from ..navigation import iterar_paginas, login_and_open_bloco
+from ..storage import sanitize_processo_numero, zip_exists
 
 ProgressFn = Callable[[str], None] | None
 
@@ -20,18 +21,10 @@ def _log(message: str, progress: ProgressFn) -> None:
         print(message)
 
 
-def _arquivo_ja_existente(download_dir: Path, numero: str) -> bool:
-    sanitized = numero.replace("/", "_").replace(".", "_").replace("-", "_")
-    for name in os.listdir(download_dir):
-        if name.startswith(f"{sanitized}_") and name.endswith(".zip"):
-            return True
-    return False
-
-
 def _baixar_zip_de_linha(
     row: Locator, page: Page, numero: str, download_dir: Path, progress: ProgressFn
 ) -> str | None:
-    sanitized = numero.replace("/", "_").replace(".", "_").replace("-", "_")
+    sanitized = sanitize_processo_numero(numero)
     context = page.context
     row_link = row.locator("td").nth(2).locator("a").first
     with context.expect_page() as popup_info:
@@ -99,7 +92,7 @@ def download_zip_lote(
         for row, numero in iterar_paginas(page, progress=progress):
             if limite is not None and contador >= limite:
                 break
-            if skip_existentes and _arquivo_ja_existente(download_dir, numero):
+            if skip_existentes and zip_exists(download_dir, numero):
                 _log(f"Pulando {numero} (já existe ZIP)", progress)
                 contador += 1
                 continue
